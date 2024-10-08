@@ -1,0 +1,15 @@
+{
+  "name": "raspagem",
+  "module": "index.ts",
+  "type": "module",
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.7.7",
+    "csv-simple-parser": "^1.0.3"
+  }
+}
