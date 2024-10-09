@@ -1,6 +1,8 @@
 import axios from "axios";
 import referencia_municipios from "./municipios_brasileiros_tse.json";
 import { parseArgs } from "util";
+import he from "he";
+import Decimal from "decimal.js";
 
 const { values } = parseArgs({
   args: Bun.argv,
@@ -68,6 +70,8 @@ const tabela = [colunas_tabela];
 
 let num_municipios = 0;
 
+const municipios_total_errado = [];
+
 try {
   for (const municipio of referencia_municipios) {
     // ! NÃO ESQUECER DE REMOVER
@@ -110,12 +114,30 @@ try {
     // Agremiações são as junções de vários partidos. Contém um array com os partidos que fazem parte da agremiação, que contém um array com os candidados do partido
     const agremiacoes = dados?.carg[0]?.agr;
 
+    let porcentagem_total_municipio = new Decimal(0);
+
     for (const agr of agremiacoes) {
       agr.par.forEach((partido: any) => {
         const sigla_partido = partido.sg;
         partido.cand.forEach((candidato: any) => {
+          const nome_candidato = he.decode(
+            candidato.nmu.replace(",", "").replace("&#09;", "")
+          );
+          // Para evitar problemas na hora de criar a tabela, trocamos a vírgula pelo ponto nos números
+          const porcentagem_candidato = Number(
+            candidato.pvap.replace(",", ".")
+          );
+
+          // Utilizamos a biblioteca Decimal para dar maior precisão na soma das porcentagens
+          const por_total_mun_dec = new Decimal(
+            candidato.pvapn.replace(",", ".")
+          );
+
+          porcentagem_total_municipio =
+            porcentagem_total_municipio.add(por_total_mun_dec);
+          // console.log(`Nome Candiadto: ${nome_candidato}`);
           const linha_tabela = [
-            candidato.nmu,
+            nome_candidato,
             sigla_partido,
             candidato.n,
             nome_municipio,
@@ -124,16 +146,29 @@ try {
             candidato.dvt,
             candidato.st,
             candidato.vap,
-            // Para evitar problemas na hora de criar a tabela:
-            candidato.pvap.replace(",", "."),
+            porcentagem_candidato,
           ];
 
           if (values.candidatura === "prefeito") {
-            linha_tabela.push(candidato.vs[0].nmu);
+            const nome_vice = he.decode(candidato.vs[0].nmu.replace(",", ""));
+            linha_tabela.push(nome_vice);
           }
 
           tabela.push(linha_tabela);
         });
+      });
+    }
+
+    const tot_porc_mun = porcentagem_total_municipio.toString();
+
+    // Os resultados 100.000000001 e 99.999999999 para a soma das porcentagens de voto em um município serão considerados corretos.
+    if (
+      tot_porc_mun !== "100" &&
+      tot_porc_mun !== "100.000000001" &&
+      tot_porc_mun !== "99.999999999"
+    ) {
+      municipios_total_errado.push({
+        [nome_municipio]: porcentagem_total_municipio,
       });
     }
   }
@@ -165,6 +200,8 @@ try {
       JSON.stringify(candidatosJson)
     );
   }
+
+  console.log("Municípios errados: ", municipios_total_errado);
 } catch (error) {
   console.error("Erro ao tentar raspar dados: ", error);
 }
