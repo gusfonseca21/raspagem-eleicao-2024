@@ -70,7 +70,9 @@ const tabela = [colunas_tabela];
 
 let num_municipios = 0;
 
-const municipios_total_errado = [];
+const falha_verificacao_municipios = [];
+
+const tolerancia = 0.01;
 
 try {
   for (const municipio of referencia_municipios) {
@@ -109,32 +111,39 @@ try {
         values.candidatura === "prefeito" ? "11" : "13"
       );
 
+    // TODO await e then na mesma linha?
     const dados = await axios.get(RECURSO_MUNICIPIO).then((res) => res.data);
+
+    const votacao = dados.v.pvnom;
 
     // Agremiações são as junções de vários partidos. Contém um array com os partidos que fazem parte da agremiação, que contém um array com os candidados do partido
     const agremiacoes = dados?.carg[0]?.agr;
 
-    let porcentagem_total_municipio = new Decimal(0);
+    let porcentagem_total_municipio = 0.0;
 
     for (const agr of agremiacoes) {
       agr.par.forEach((partido: any) => {
         const sigla_partido = partido.sg;
         partido.cand.forEach((candidato: any) => {
-          const nome_candidato = he.decode(
-            candidato.nmu.replace(",", "").replace("&#09;", "")
-          );
+          let nome_candidato = candidato.nmu
+            .replaceAll(",", "")
+            .replace(";", "")
+            .replace(/&#09;/g, "");
+          nome_candidato = he.decode(nome_candidato);
+          // const nome_candidato = he.decode(
+          //   candidato.nmu
+          //     .replaceAll(",", "")
+          //     .replace(";", "")
+          //     .replace(/&#09;/g, "")
+          // );
           // Para evitar problemas na hora de criar a tabela, trocamos a vírgula pelo ponto nos números
           const porcentagem_candidato = Number(
             candidato.pvap.replace(",", ".")
           );
 
-          // Utilizamos a biblioteca Decimal para dar maior precisão na soma das porcentagens
-          const por_total_mun_dec = new Decimal(
-            candidato.pvapn.replace(",", ".")
-          );
+          // TODO remover biblioteca Decimal
+          porcentagem_total_municipio += porcentagem_candidato;
 
-          porcentagem_total_municipio =
-            porcentagem_total_municipio.add(por_total_mun_dec);
           // console.log(`Nome Candiadto: ${nome_candidato}`);
           const linha_tabela = [
             nome_candidato,
@@ -159,22 +168,35 @@ try {
       });
     }
 
+    console.log(
+      "Total de votos válidos município: ",
+      porcentagem_total_municipio
+    );
+    console.log("votacao", votacao);
     const tot_porc_mun = porcentagem_total_municipio.toString();
 
-    // Os resultados 100.000000001 e 99.999999999 para a soma das porcentagens de voto em um município serão considerados corretos.
+    // Os resultados 100.000000001 e 99.999999999 para a soma das porcentagens de voto em um município serão ignorados para eliminar a maior parte dos resultados considerados errados mas que estão corretos.
     if (
       tot_porc_mun !== "100" &&
       tot_porc_mun !== "100.000000001" &&
       tot_porc_mun !== "99.999999999"
     ) {
-      municipios_total_errado.push({
+      falha_verificacao_municipios.push({
         [nome_municipio]: porcentagem_total_municipio,
       });
     }
   }
 
   if (values.formato === "csv") {
-    const csvContent = tabela.map((row) => row.join(",")).join("\n");
+    // const csvContent = tabela.map((row) => row.join(",")).join("\n");
+    // Bun.write(`resultado_${values.candidatura}_1-turno_2024.csv`, csvContent);
+
+    const arrayLinha: string[] = [];
+    tabela.forEach((linha, index) => {
+      const line = linha.join(",");
+      arrayLinha.push(line);
+    });
+    const csvContent = arrayLinha.join("\n");
     Bun.write(`resultado_${values.candidatura}_1-turno_2024.csv`, csvContent);
   }
 
@@ -188,11 +210,15 @@ try {
     // Remover o array de nome de colunas do array principal
     tabela.shift();
 
+    // Transforma os arrays em objetos. As chaves serão os nomes das colunas da tabela
     const candidatosJson = tabela.map((candidato) => {
-      return colunas_tabela.reduce((obj, chave, index) => {
-        obj[chave] = candidato[index];
-        return obj;
-      }, {});
+      return colunas_tabela.reduce(
+        (obj: { [key: string]: any }, chave, index) => {
+          obj[chave] = candidato[index];
+          return obj;
+        },
+        {}
+      );
     });
 
     Bun.write(
@@ -201,7 +227,7 @@ try {
     );
   }
 
-  console.log("Municípios errados: ", municipios_total_errado);
+  console.log("Municípios errados: ", falha_verificacao_municipios);
 } catch (error) {
   console.error("Erro ao tentar raspar dados: ", error);
 }
