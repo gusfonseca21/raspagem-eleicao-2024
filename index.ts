@@ -2,7 +2,6 @@ import axios from "axios";
 import referencia_municipios from "./municipios_brasileiros_tse.json";
 import { parseArgs } from "util";
 import he from "he";
-import Decimal from "decimal.js";
 
 const { values } = parseArgs({
   args: Bun.argv,
@@ -76,7 +75,7 @@ const tolerancia = 0.01;
 
 try {
   for (const municipio of referencia_municipios) {
-    // ! NÃO ESQUECER DE REMOVER
+    // ! Caso queira limitar o loop
     // if (num_municipios !== 1) break;
 
     num_municipios++;

@@ -1,15 +1,27 @@
-# raspagem
+# Raspagem Resultados Eleição 2024
 
-To install dependencies:
+Projeto dedicado a baixar os dados das eleições municipais de 2024.
+
+Projeto iniciado logo depois do final do 1o turno.
+
+A raspagem dos dados é feita diretamente do servidor do TSE.
+
+Não há certeza se após o segundo turno este código irá funcionar da mesma maneira.
+
+Instale as dependências:
 
 ```bash
 bun install
 ```
 
-To run:
+Para fazer o download e a formatação dos dados:
 
 ```bash
-bun run index.ts
+bun run index.ts --candidatura "prefeito/vereador" --formato "csv/json"
 ```
 
-This project was created using `bun init` in bun v1.1.29. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
+Mas o modo mais recomendado é fazer o download dos JSONs diretamente da fonte:
+
+```bash
+bun run ./download-fonte/index.ts
+```
